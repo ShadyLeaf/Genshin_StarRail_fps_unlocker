@@ -1,4 +1,4 @@
-﻿
+﻿#include "Windows.h"
 
 static DWORD64 load_pe(LPVOID pe_data)
 {
@@ -109,6 +109,28 @@ static DWORD64 load_pe(LPVOID pe_data)
         else
             protect = characteristics & IMAGE_SCN_MEM_WRITE ? PAGE_READWRITE : PAGE_READONLY;
         VirtualProtectEx_Internal((HANDLE)-1, (PBYTE)base + section[i].VirtualAddress, section[i].Misc.VirtualSize, protect, &old_protect);
+    }
+
+    if (nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION].Size)
+    {
+        PIMAGE_RUNTIME_FUNCTION_ENTRY exception_dir = (PIMAGE_RUNTIME_FUNCTION_ENTRY)((PBYTE)base + nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION].VirtualAddress);
+        DWORD exception_size = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION].Size;
+        HMODULE ntdll = (((PPEB64)__readgsqword(0x60))->Ldr->InMemoryOrderModuleList.Flink->Next)->ModBase;
+        if (ntdll)
+        {
+            typedef BOOL(WINAPI* RtlAddFunctionTable_t)(PIMAGE_RUNTIME_FUNCTION_ENTRY, DWORD, DWORD64);
+            RtlAddFunctionTable_t pRtlAddFunctionTable = (RtlAddFunctionTable_t)GetProcAddress_Internal(ntdll, "RtlAddFunctionTable");
+
+            if (pRtlAddFunctionTable)
+            {
+                DWORD count = exception_size / sizeof(RUNTIME_FUNCTION);
+                if (!pRtlAddFunctionTable(exception_dir, count, (DWORD64)base))
+                {
+                    // result_load = -7;
+                    // goto __failed_exit;
+                }
+            }
+        }
     }
 
     if(1)
