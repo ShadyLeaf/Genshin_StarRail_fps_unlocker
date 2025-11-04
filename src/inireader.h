@@ -1,4 +1,4 @@
-// Read an INI file into easy-to-access name/value pairs.
+﻿// Read an INI file into easy-to-access name/value pairs.
 
 // inih and INIReader are released under the New BSD license (see LICENSE.txt).
 // Go to the project home page for more info:
@@ -37,16 +37,16 @@ extern "C" {
        stop on first error), -1 on file open error, or -2 on memory allocation
        error (only when INI_USE_STACK is zero).
     */
-    int ini_parse(const wchar_t* filename, ini_handler handler, void* user);
+    //int ini_parse(const wchar_t* filename, ini_handler handler, void* user);
 
     /* Same as ini_parse(), but takes a FILE* instead of filename. This doesn't
        close the file when it's finished -- the caller must do that. */
-    int ini_parse_file(FILE* file, ini_handler handler, void* user);
+    //int ini_parse_file(FILE* file, ini_handler handler, void* user);
 
     /* Same as ini_parse(), but takes an ini_reader function pointer instead of
        filename. Used for implementing custom or string-based I/O. */
-    int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
-        void* user);
+    //int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
+    //    void* user);
 
     /* Nonzero to allow multi-line value parsing, in the style of Python's
        configparser. If allowed, ini_parse() will call the handler with the same
@@ -232,7 +232,7 @@ static wchar_t* Read_line(wchar_t* deststr, size_t num, wchar_t** stream_rawstr)
 }
 
 /* See documentation in header file. */
-int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler, void* user)
+extern "C" inline int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler, void* user)
 {
     wchar_t* start;
     wchar_t* end;
@@ -361,13 +361,13 @@ __exit_block:
 }
 
 /* See documentation in header file. */
-inline int ini_parse_file(FILE* file, ini_handler handler, void* user)
+extern "C" inline int ini_parse_file(FILE* file, ini_handler handler, void* user)
 {
     return ini_parse_stream((ini_reader)fgets, file, handler, user);
 }
 
 /* See documentation in header file. */
-inline int ini_parse(const wchar_t* filename, ini_handler handler, void* user)
+extern "C" inline int ini_parse(const wchar_t* filename, ini_handler handler, void* user)
 {
     FILE* file = nullptr;
     int error;

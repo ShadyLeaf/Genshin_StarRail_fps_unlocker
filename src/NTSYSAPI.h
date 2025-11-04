@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #ifndef __NT_SYSAPI_H__
 #define __NT_SYSAPI_H__
@@ -59,11 +59,11 @@ EXTERN_C const PIMAGE_TLS_CALLBACK pTLS_CALLBACKs[] = { TLS_CALLBACK, 0 };
 #pragma const_seg()
 
 
-EXTERN_C NTSTATUS NTAPI asm_syscall();
+extern "C" NTSTATUS NTAPI asm_syscall();
 
-EXTERN_C NTSYSAPI DWORD NTAPI RtlSetLastWin32ErrorAndNtStatusFromNtStatus(NTSTATUS Status);
+extern "C" NTSYSAPI DWORD NTAPI RtlSetLastWin32ErrorAndNtStatusFromNtStatus(NTSTATUS Status);
 
-EXTERN_C NTSYSAPI DWORD NTAPI NtRaiseHardError(
+extern "C" NTSYSAPI DWORD NTAPI NtRaiseHardError(
     NTSTATUS    ErrorStatus,
     DWORD       NumberOfParameters,
     DWORD       UnicodeStringParameterMask,
@@ -72,7 +72,7 @@ EXTERN_C NTSYSAPI DWORD NTAPI NtRaiseHardError(
     PDWORD      Response
     );
 
-EXTERN_C NTSYSAPI ULONG NTAPI RtlGetFullPathName_U(
+extern "C" NTSYSAPI ULONG NTAPI RtlGetFullPathName_U(
     _In_ PCWSTR FileName,
     _In_ ULONG BufferLength,
     _Out_writes_bytes_(BufferLength) PWSTR Buffer,

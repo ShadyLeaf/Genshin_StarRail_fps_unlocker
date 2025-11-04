@@ -1,4 +1,4 @@
-#ifndef __SHELLCODE_H__
+﻿#ifndef __SHELLCODE_H__
 #define __SHELLCODE_H__
 
 #include <stdint.h>
