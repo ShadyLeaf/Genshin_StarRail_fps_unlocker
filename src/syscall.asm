@@ -1,4 +1,3 @@
-﻿
 .code
 	ALIGN 16
 	asm_syscall proc
