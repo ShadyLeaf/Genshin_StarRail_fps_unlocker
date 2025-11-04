@@ -1,4 +1,6 @@
 ﻿#include "Windows.h"
+#define NTSYSAPI_NO_TLS_CALLBACK
+#include "NTSYSAPI.h"
 
 static DWORD64 load_pe(LPVOID pe_data)
 {
