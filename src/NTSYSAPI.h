@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #ifndef __NT_SYSAPI_H__
 #define __NT_SYSAPI_H__
@@ -43,7 +43,7 @@
 
 NTSTATUS init_API(void);
 
-void NTAPI TLS_CALLBACK(PVOID DllHandle, DWORD Reason, PVOID Reserved)
+static void NTAPI TLS_CALLBACK(PVOID DllHandle, DWORD Reason, PVOID Reserved)
 {
     if (Reason == DLL_PROCESS_ATTACH)
     {
@@ -54,16 +54,18 @@ void NTAPI TLS_CALLBACK(PVOID DllHandle, DWORD Reason, PVOID Reserved)
     }
 }
 
+#ifndef NTSYSAPI_NO_TLS_CALLBACK
 #pragma const_seg(".CRT$XLB")
 EXTERN_C const PIMAGE_TLS_CALLBACK pTLS_CALLBACKs[] = { TLS_CALLBACK, 0 };
 #pragma const_seg()
+#endif
 
 
-EXTERN_C NTSTATUS NTAPI asm_syscall();
+extern "C" NTSTATUS NTAPI asm_syscall();
 
-EXTERN_C NTSYSAPI DWORD NTAPI RtlSetLastWin32ErrorAndNtStatusFromNtStatus(NTSTATUS Status);
+extern "C" NTSYSAPI DWORD NTAPI RtlSetLastWin32ErrorAndNtStatusFromNtStatus(NTSTATUS Status);
 
-EXTERN_C NTSYSAPI DWORD NTAPI NtRaiseHardError(
+extern "C" NTSYSAPI DWORD NTAPI NtRaiseHardError(
     NTSTATUS    ErrorStatus,
     DWORD       NumberOfParameters,
     DWORD       UnicodeStringParameterMask,
@@ -72,6 +74,12 @@ EXTERN_C NTSYSAPI DWORD NTAPI NtRaiseHardError(
     PDWORD      Response
     );
 
+extern "C" NTSYSAPI ULONG NTAPI RtlGetFullPathName_U(
+    _In_ PCWSTR FileName,
+    _In_ ULONG BufferLength,
+    _Out_writes_bytes_(BufferLength) PWSTR Buffer,
+    _Out_opt_ PWSTR* FilePart
+);
 
 static DWORD init_Status = -1;
 
@@ -795,14 +803,14 @@ typedef struct NTSYSAPIADDR
 }NTSYSAPIADDR, * PNTSYSAPIADDR, ** PPNTSYSAPIADDR;
 
 
-DWORD64 Ntdll_ADDR = 0;
-DWORD64 Kernel32_ADDR = 0;
+static DWORD64 Ntdll_ADDR = 0;
+static DWORD64 Kernel32_ADDR = 0;
 
-void* CreateProcessW_p = 0;
+static void* CreateProcessW_p = 0;
 
 static DWORD64 API = 0;
 
-__declspec(noinline) void decbyte(void* dst, BYTE num)
+__declspec(noinline) static void decbyte(void* dst, BYTE num)
 {
     num--;
     while (num != 0)
@@ -814,7 +822,7 @@ __declspec(noinline) void decbyte(void* dst, BYTE num)
 }
 
 //copy from vmp
-__declspec(noinline) const wchar_t* FindFileVersion(const BYTE* ptr, size_t data_size) 
+__declspec(noinline) static const wchar_t* FindFileVersion(const BYTE* ptr, size_t data_size) 
 {
     const wchar_t* data = reinterpret_cast<const wchar_t*>(ptr);
     data_size /= sizeof(wchar_t);
@@ -839,7 +847,7 @@ __declspec(noinline) const wchar_t* FindFileVersion(const BYTE* ptr, size_t data
 }
 
 //ntdll filever
-__declspec(noinline) WORD ParseOSBuildBumber()
+__declspec(noinline) static WORD ParseOSBuildBumber()
 {
     HMODULE ntdll = 0;
     if (Ntdll_ADDR)
@@ -896,7 +904,7 @@ __declspec(noinline) WORD ParseOSBuildBumber()
     return os_build_number;
 }
 
-__declspec(noinline) int ParseSyscallscNum(void* func, DWORD* scNum)
+__declspec(noinline) static int ParseSyscallscNum(void* func, DWORD* scNum)
 {
     if (func)
     {
@@ -986,7 +994,7 @@ __forceinline void InitUnicodeString(PUNICODE_STRING DestinationString, PCWSTR S
     DestinationString->Buffer = (PWCH)SourceString;
 }
 
-__declspec(noinline) FARPROC GetProcAddress_Internal(HMODULE module, LPCSTR proc_name)
+__declspec(noinline) static FARPROC GetProcAddress_Internal(HMODULE module, LPCSTR proc_name)
 {
     // check input
     if (!module || !proc_name)
@@ -1319,7 +1327,7 @@ __declspec(noinline) static DWORD WINAPI GetProcPID(LPCWSTR ProcessName)
     }
 
     VirtualFree_Internal(info, 0, MEM_RELEASE);
-    return (DWORD)PID;
+    return (DWORD)(DWORD_PTR)PID;
 }
 
 
@@ -1414,7 +1422,7 @@ __declspec(noinline) static HANDLE WINAPI OpenProcess_Internal(DWORD dwDesiredAc
     CLIENT_ID tempID = { 0 };
     tempOb.Length = 0x30;
     tempOb.Attributes = 0x2;
-    tempID.UniqueProc = (HANDLE)dwProcessId;
+    tempID.UniqueProc = (HANDLE)(DWORD_PTR)dwProcessId;
     PNTSYSAPIADDR DecAPI = *(PPNTSYSAPIADDR)~API;
     NTSTATUS ret = DecAPI->NtOpenProcess(&opHandle, dwDesiredAccess, &tempOb, &tempID);
     if (ret)
@@ -1518,8 +1526,8 @@ static __forceinline void init_syscall_buff(void* buff, void* CallAddr, NTSYSCAL
     WORD ra2 = ra & 0xFFFF;
     ra1 ^= ra2;
     ra2 ^= ra1;
-    WORD ra3 = (~raRAXL ^ ra) & 0xFFFF;
-    WORD ra4 = (~raRAXH ^ ra) & 0xFFFF;
+    WORD ra3 = ((WORD)(~raRAXL) ^ (WORD)ra) & 0xFFFF;
+    WORD ra4 = ((WORD)(~raRAXH) ^ (WORD)ra) & 0xFFFF;
 
     BYTE* startaddr = (BYTE*)buff + (DWORD)((DWORD)(ra1 & 0xFF) << 4);//private syscall start addr
     BYTE* precall = ((startaddr + 0x800) + (DWORD)((DWORD)(ra2 & 0xFF) << 4));//jump to buildfakestack addr
@@ -1645,7 +1653,7 @@ static NTSTATUS init_NTAPI(DWORD* gspeb, DWORD CMode, DWORD64* PretValue)
 
     NTSYSCALL_SCNUMBER SC_number;
     NTSYSAPIADDR tempstore;
-    LPCSTR isWine = (LPCSTR)CMode;
+    LPCSTR isWine = (LPCSTR)(DWORD_PTR)CMode;
 
     if(!isWine)
     {
