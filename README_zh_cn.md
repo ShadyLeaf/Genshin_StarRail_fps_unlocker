@@ -29,11 +29,6 @@
  - unlocker.exe -[游戏] -[给解锁器的参数在游戏参数前] -[游戏参数...]
  - 例 unlocker.exe -Genshin -screen-width 3840 -screen-height 1620 -screen-fullscreen 1
  - 例 unlocker.exe -HKSR -...
- - 在启动的游戏后面添加参数"**-EnableMobileUI**"来便捷启用移动端ui,该参数必须是**第二个**，否则无法被识别
- - unlocker.exe -Genshin -EnableMobileUI
- - DLL注入，使用前确保来源可靠性
- - unlocker.exe -[游戏] -loadlib [绝对路径]
- - unlocker.exe -Genshin -EnableMobileUI -loadlib C:\\Folder\\plug.dll -[游戏参数...]
 
 ### 默认热键           PS:按键要按一次改一次，不是长按
 - **END** 开/关

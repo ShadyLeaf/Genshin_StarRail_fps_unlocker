@@ -35,10 +35,6 @@
  - unlocker.exe -[game] -[game argv...]
  - eg. unlocker.exe -Genshin -screen-width 3840 -screen-height 1620 -screen-fullscreen 1
  - eg. unlocker.exe -HKSR -???
- - If you want start with mobile UI add the arg "**-EnableMobileUI**" **must be in the second**
- - unlocker.exe -[game] -EnableMobileUI -.......
- - DLL inject 
- - unlocker.exe -[game] -LoadLib [path]
 
 ## Inject
  - Now must be unlocked by inject 
