@@ -37,7 +37,6 @@ uint32_t Target_set_60 = 1000;
 uint32_t Target_set_30 = 60;
 uint32_t PowerSave_target = 10;
 bool isGenshin = 1;
-bool Use_mobile_UI = 0;
 bool _main_state = 1;
 bool Process_endstate = 0;
 bool ErrorMsg_EN = 1;
@@ -1049,7 +1048,6 @@ __path_ok:
 struct Boot_arg
 {
     LPWSTR Game_Arg;
-    LPWSTR Path_Lib;
 };
 //[out] CommandLinew
 //The first 16 bytes are used by other arg
@@ -1068,63 +1066,22 @@ static bool Init_Game_boot_arg(Boot_arg* arg)
         int _game_argc_start = 2;
         wchar_t boot_genshin[] = L"-genshin";
         wchar_t boot_starrail[] = L"-hksr";
-        wchar_t loadLib[] = L"-loadlib";
-        wchar_t Use_Mobile_UI[] = L"-enablemobileui";
         wstring* temparg = NewWstring(0x1000);
         *temparg = argvW[1];
         towlower0((wchar_t*)temparg->c_str());
         if (*temparg == boot_genshin)
         {
             SetConsoleTitleA("This console control GenshinFPS");
-
-            if (argNum > 2)
-            {
-                *temparg = argvW[2];
-                towlower0((wchar_t*)temparg->c_str());
-                if (*temparg == Use_Mobile_UI)
-                {
-                    Use_mobile_UI = 1;
-                    //CommandLine += L"use_mobile_platform -is_cloud 1 -platform_type CLOUD_THIRD_PARTY_MOBILE ";
-                    _game_argc_start = 3;
-                }
-            }
         }
         else if (*temparg == boot_starrail)
         {
             isGenshin = 0;
             SetConsoleTitleA("This console control HKStarRailFPS");
-            if (argNum > 2)
-            {
-                *temparg = argvW[2];
-                towlower0((wchar_t*)temparg->c_str());
-                if (*temparg == Use_Mobile_UI)
-                {
-                    Use_mobile_UI = 1;
-                    _game_argc_start = 3;
-                }
-            }
         }
         else
         {
             Show_Error_Msg(L"参数错误 \nArguments error ( unlocker.exe -[game] -[game argv] ..... ) \n");
             return 0;
-        }
-        if (argNum > _game_argc_start)
-        {
-            *temparg = argvW[_game_argc_start];
-            towlower0((wchar_t*)temparg->c_str());
-            if (*temparg == loadLib)
-            {
-                _game_argc_start++;
-                if (argNum > _game_argc_start)
-                {
-                    *temparg = argvW[_game_argc_start];
-                    LPVOID LibPath = malloc((temparg->size() * 2) + 0x10);
-                    strncpy0((wchar_t*)LibPath, temparg->c_str(), temparg->size() * 2);
-                    arg->Path_Lib = (LPWSTR)LibPath;
-                    _game_argc_start++;
-                }
-            }
         }
         for (int i = _game_argc_start; i < argNum; i++)
         {
@@ -1161,18 +1118,12 @@ static bool Init_Game_boot_arg(Boot_arg* arg)
 
 typedef struct Hook_func_list
 {
-    uint64_t UI_unhook_time;
-    uint64_t Func_gui_set;
-    uint64_t Func_input_set;
-    uint64_t Grph_class;
-    uint32_t Grph_UIcl_VA;
-	uint32_t Grph_inputcl_VA;
+    // Mobile UI related fields removed
 }Hook_func_list, *PHook_func_list;
 
 typedef struct inject_arg
 {
     uint64_t Pfps;//GI-fps-set
-    uint64_t Bootui;//HKSR ui /GIui type
     uint64_t verfiy;//code verfiy
     uint64_t P_UnityWndclass;
     uint64_t payloadoep;
@@ -1239,12 +1190,6 @@ static uint64_t inject_patch(HANDLE Tar_handle, uintptr_t Tar_ModBase, uintptr_t
     {
         *(uint64_t*)(_sc_buffer + PowerSaveSet_FuncVA) = 0xCCC3C889;
     }
-    if ((!isGenshin) && arg->Bootui)
-    {
-        *(uint64_t*)(_sc_buffer + 0x20) = arg->Bootui;//HKSR mobile uisetptr
-        *(uint32_t*)(_sc_buffer + 0x28) = 2;
-        *(uint64_t*)(_sc_buffer + 0x30) = (uint64_t)Remote_payload_buffer + HKSR_UISet_FuncVA;
-    }
     if (isGenshin && GI_Func)
     {
         //hookverfiy
@@ -1292,21 +1237,6 @@ static uint64_t inject_patch(HANDLE Tar_handle, uintptr_t Tar_ModBase, uintptr_t
             int32_t immva = (int64_t)((Private_buffer - _ptr_fps) - 4);
             *(int32_t*)(((uint64_t)(&Pfps_patch->hookedpart)) + mask) = immva;
             hook_info_ptr = (uint64_t)hook_info_ptr + sizeof(hooked_func_struct);
-        }
-
-        if (GI_Func->UI_unhook_time)
-        {
-            *(uint64_t*)(_sc_buffer + 0x40) = GI_Func->UI_unhook_time;
-            *(uint64_t*)(_sc_buffer + 0x48) = (uint64_t)Remote_payload_buffer + 0x3000;
-			memcpy(_sc_buffer + 0x3000, &GI_Func->Func_gui_set, sizeof(Hook_func_list) - sizeof(uint64_t));
-            if (ReadProcessMemoryInternal(Tar_handle, (void*)GI_Func->UI_unhook_time, (_sc_buffer + 0x50), 0x10, 0))
-            {
-                uint64_t hookpart[2] = { 0x225FF,  ((uint64_t)Remote_payload_buffer + GI_UnHooked_UI_fVA) };
-                if (!WriteProcessMemoryInternal(Tar_handle, (void*)GI_Func->UI_unhook_time, &hookpart, 0x10, 0))
-                    Show_Error_Msg(L"Failed write payload 0(GIui)");
-            }
-            else Show_Error_Msg(L"Failed ReadFunc 0 (GIui)");
-
         }
     }
 __exit_block:
@@ -1436,198 +1366,6 @@ __inject_proc:
 }
 
 
-static HMODULE RemoteDll_Inject_mem(HANDLE Tar_handle, LPCWSTR DllPath)
-{
-    LPVOID buffer = 0;
-    SIZE_T file_size = 0;
-    if (DllPath)
-    {
-        HANDLE file_Handle = CreateFileW(DllPath, GENERIC_READ, NULL, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (file_Handle != INVALID_HANDLE_VALUE)
-        {
-            GetFileSizeEx(file_Handle, (PLARGE_INTEGER)&file_size);
-            buffer = VirtualAlloc_Internal(NULL, file_size, PAGE_READWRITE);
-            if (!buffer)
-            {
-                Show_Error_Msg(L"VirtualAlloc Failed! (loadlib mem)");
-                CloseHandle_Internal(file_Handle);
-                return 0;
-            }
-            if (ReadFile(file_Handle, buffer, file_size, NULL, NULL))
-            {
-                if (*(WORD*)buffer == 0x5A4D)
-                {
-                    CloseHandle_Internal(file_Handle);
-                    goto __inject_proc;
-                }
-                else
-                {
-                    Show_Error_Msg(L"Bad PE file (loadlib mem)");
-                }
-            }
-            else
-            {
-                Show_Error_Msg(L"ReadFile Failed! (loadlib mem)");
-            }
-            CloseHandle_Internal(file_Handle);
-            VirtualFree_Internal(buffer, 0, MEM_RELEASE);
-            return 0;
-        }
-        Show_Error_Msg(L"Open LibFile Failed!");
-    }
-    return 0;
-
-__inject_proc:
-    HMODULE result = 0;
-    LPVOID buffer_load = VirtualAllocEx_Internal(Tar_handle, NULL, 0x2000, PAGE_READWRITE);
-    LPVOID shell_mem_load = VirtualAllocEx_Internal(Tar_handle, NULL, sizeof(_PE_MEM_LOADER), PAGE_READWRITE);
-    LPVOID file_buffer = VirtualAllocEx_Internal(Tar_handle, NULL, file_size, PAGE_READWRITE);
-    if (buffer_load && shell_mem_load && file_buffer)
-    {
-        DWORD64 payload[5] = { 0 };
-        payload[0] = 0x15FFC03128EC8348;
-        payload[1] = 0x0589484800000014;
-        payload[2] = 0x8348C03300000FEC;
-        payload[3] = 0xCCCCCCCCCCC328C4;
-        payload[4] = (DWORD64)shell_mem_load;
-        if (WriteProcessMemoryInternal(Tar_handle, buffer_load, &payload, 0x30, 0) &&
-            WriteProcessMemoryInternal(Tar_handle, shell_mem_load, (LPVOID)&_PE_MEM_LOADER, sizeof(_PE_MEM_LOADER), 0) &&
-            WriteProcessMemoryInternal(Tar_handle, file_buffer, buffer, file_size, 0))
-        {
-            VirtualFree_Internal(buffer, 0, MEM_RELEASE);
-            if (VirtualProtectEx_Internal(Tar_handle, buffer_load, 0x1000, PAGE_EXECUTE_READ, 0) &&
-                VirtualProtectEx_Internal(Tar_handle, shell_mem_load, sizeof(_PE_MEM_LOADER), PAGE_EXECUTE_READWRITE, 0) &&
-                VirtualProtectEx_Internal(Tar_handle, file_buffer, file_size, PAGE_READONLY, 0))
-            {
-                HANDLE hThread = CreateRemoteThreadEx_Internal(Tar_handle, 0, (LPTHREAD_START_ROUTINE)buffer_load, file_buffer);
-                if (hThread)
-                {
-                    if (WaitForSingleObject(hThread, 60000))
-                    {
-                        Show_Error_Msg(L"Lib load Wait Time out!");
-                        CloseHandle_Internal(hThread);
-                        goto __failure_safe_exit;
-                    }
-                    else
-                    {
-                        int32_t ecode = GetExitCodeThread_Internal(hThread);
-                        if (ecode < 0)
-                        {
-                            BaseSetLastNTError_inter(ecode);
-                            Show_Error_Msg(L"Lib load has an error occurred! Game has crashed");
-                            CloseHandle_Internal(hThread);
-                            ExitProcess(0);
-                        }
-                        else
-                        {
-                            ReadProcessMemoryInternal(Tar_handle, ((BYTE*)buffer_load) + 0x1000, &result, 0x8, 0);
-                        }
-                    }
-                    CloseHandle_Internal(hThread);
-                }
-                else
-                {
-                    Show_Error_Msg(L"CreateThread Failed! (loadlib mem)");
-                }
-            }
-            else
-            {
-                Show_Error_Msg(L"VirtualProtectEx Failed! (loadlib mem)");
-            }
-        }
-        else
-        {
-            Show_Error_Msg(L"WriteProcessMemory Failed! (loadlib mem)");
-        }
-    }
-    else
-    {
-        Show_Error_Msg(L"VirtualAllocEx Failed! (loadlib mem)");
-    }
-    VirtualFreeEx_Internal(Tar_handle, buffer_load, 0, MEM_RELEASE);
-    VirtualFreeEx_Internal(Tar_handle, file_buffer, 0, MEM_RELEASE);
-    VirtualFreeEx_Internal(Tar_handle, shell_mem_load, 0, MEM_RELEASE);
-__failure_safe_exit:
-    VirtualFree_Internal(buffer, 0, MEM_RELEASE);
-    return result;
-}
-
-
-//Get the address of the ptr in the target process
-static uint64_t Hksr_ENmobile_get_Ptr(HANDLE Tar_handle, LPCWSTR GPath)
-{
-    uintptr_t GameAssembly_PEbuffer;
-    HMODULE il2cpp_base;
-    {
-        wstring path = GPath;
-        path += L"\\GameAssembly.dll";
-        il2cpp_base = RemoteDll_Inject(Tar_handle, path.c_str());
-        if (!il2cpp_base)
-        {
-            Show_Error_Msg(L"load GameAssembly.dll Failed !\n");
-            return 0;
-        }
-        GameAssembly_PEbuffer = (uintptr_t)VirtualAlloc_Internal(0, 0x1000, PAGE_READWRITE);
-        if (!GameAssembly_PEbuffer)
-            return 0;
-        if (!ReadProcessMemoryInternal(Tar_handle, il2cpp_base, (void*)GameAssembly_PEbuffer, 0x1000, 0))
-            return 0;
-        
-        int32_t* WinPEfileVA = (int32_t*)((uint64_t)GameAssembly_PEbuffer + 0x3C); //dos_header
-        PIMAGE_NT_HEADERS64 PEfptr = (PIMAGE_NT_HEADERS64)((int64_t)GameAssembly_PEbuffer + *WinPEfileVA); //get_winPE_VA
-        uint32_t imgsize = PEfptr->OptionalHeader.SizeOfImage;
-        LPVOID IMGbuffer = VirtualAlloc_Internal(0, imgsize, PAGE_READWRITE);
-        if (!IMGbuffer)
-            return 0;
-        if (!ReadProcessMemoryInternal(Tar_handle, il2cpp_base, IMGbuffer, imgsize, 0))
-            return 0;
-
-        VirtualFree_Internal((void*)GameAssembly_PEbuffer, 0, MEM_RELEASE);
-        GameAssembly_PEbuffer = (uintptr_t)IMGbuffer;
-    }
-    uintptr_t Ua_il2cpp_RVA = 0;
-    DWORD32 Ua_il2cpp_Vsize = 0;
-    uint64_t retvar = 0;
-    if (!Get_Section_info(GameAssembly_PEbuffer, "il2cpp", &Ua_il2cpp_Vsize, &Ua_il2cpp_RVA, GameAssembly_PEbuffer))
-    {
-        Show_Error_Msg(L"get Section info Error !\n");
-        goto __exit;
-    }
-    if (Ua_il2cpp_RVA && Ua_il2cpp_Vsize)
-    {
-        //80 B9 ?? ?? ?? ?? 00 74 46 C7 05 ?? ?? ?? ?? 03 00 00 00 48 83 C4 20 5E C3       
-        //      75 05 E8 ?? ?? ?? ?? C7 05 ?? ?? ?? ?? 03 00 00 00 48 83 C4 28 C3          
-        DWORD64 tar_addr;
-        DWORD64 address;
-        if (address = PatternScan_Region((uintptr_t)Ua_il2cpp_RVA, Ua_il2cpp_Vsize, "80 B9 ?? ?? ?? ?? 00 0F 84 ?? ?? ?? ?? C7 05 ?? ?? ?? ?? 03 00 00 00 48 83 C4 20 5E C3"))
-        {
-            tar_addr = address + 15;
-        }
-        else if (address = PatternScan_Region((uintptr_t)Ua_il2cpp_RVA, Ua_il2cpp_Vsize, "80 B9 ?? ?? ?? ?? 00 74 ?? C7 05 ?? ?? ?? ?? 03 00 00 00 48 83 C4 20 5E C3"))
-        {
-            tar_addr = address + 11;
-        }
-        else if (address = PatternScan_Region((uintptr_t)Ua_il2cpp_RVA, Ua_il2cpp_Vsize, "75 05 E8 ?? ?? ?? ?? C7 05 ?? ?? ?? ?? 03 00 00 00 48 83 C4 28 C3"))
-        {
-            tar_addr = address + 9;
-        }
-        else
-        {
-            Show_Error_Msg(L"UI pattern outdate!");
-            goto __exit;
-        }
-        int64_t rip = tar_addr;
-        rip += *(int32_t*)rip;
-        rip += 8;
-        rip -= GameAssembly_PEbuffer;
-        retvar = ((uint64_t)il2cpp_base + rip);
-    }
-    
-__exit:
-    VirtualFree_Internal((void*)GameAssembly_PEbuffer, 0, MEM_RELEASE);
-    return retvar;
-
-}
 
 //For choose suspend
 static DWORD __stdcall Thread_display(LPVOID null)
@@ -1750,12 +1488,8 @@ int main(/*int argc, char** argvA*/void)
     free(barg.Game_Arg);
 
     inject_arg injectarg = { 0 };
-    Hook_func_list GI_Func = { 0 };
+    Hook_func_list GI_Func = { };
     
-    if ((isGenshin == 0) && Use_mobile_UI)
-    {
-        injectarg.Bootui = Hksr_ENmobile_get_Ptr(pi->hProcess, ProcessDir->c_str());
-    }
     //加载和获取模块信息
     LPVOID _imgbase_PE_buffer = 0;
     uintptr_t Text_Remote_RVA = 0;
@@ -2026,57 +1760,6 @@ __genshin_il:
             CloseHandle_Internal(pi->hProcess);
             return 0;
         }
-        if (Use_mobile_UI)
-        {
-            //get struct ptr RVA
-            //48 8B 05 ?? ?? ?? ?? 0F 85 ?? ?? ?? ?? 48 8B B8 ?? ?? ?? ?? 48 85 FF 0F 84 ?? ?? ?? ?? 83 BF ?? ?? ?? ?? 03
-            address = PatternScan_Region((uintptr_t)Copy_Text_VA, Text_Vsize, "48 8B 05 ?? ?? ?? ?? 48 8B 88 ?? ?? ?? ?? 48 85 C9 0F ?? ?? ?? ?? ?? BA 02 00 00 00 E8 ?? ?? ?? ?? 48 89 F9 BA 03 00 00 00 E8");
-            if (address)
-            {
-                int64_t rip = address;
-                rip += 0x3;
-                rip += *(int32_t*)(rip)+4;
-                GI_Func.Grph_class = rip - (uintptr_t)Copy_Text_VA + Text_Remote_RVA;
-				rip = address + 0xA;
-				GI_Func.Grph_UIcl_VA = *(int32_t*)(rip);
-                rip = address + 0x1D;
-				rip += *(int32_t*)(rip)+4;
-                GI_Func.Func_gui_set = rip - (uintptr_t)Copy_Text_VA + Text_Remote_RVA;
-				rip = address + 0x2A;
-				rip += *(int32_t*)(rip)+4;
-                GI_Func.Func_input_set = rip - (uintptr_t)Copy_Text_VA + Text_Remote_RVA;
-            }
-            else
-            {
-                Use_mobile_UI = 0;
-            }
-            address = PatternScan_Region((uintptr_t)Copy_Text_VA, Text_Vsize, "48 8B 05 ?? ?? ?? ?? 0F 85 ?? ?? ?? ?? 48 8B B8 ?? ?? ?? ?? 48 85 FF 0F 84 ?? ?? ?? ?? 83 BF ?? ?? ?? ?? 03");
-            if (address)
-            {
-                int64_t rip = address;
-                rip += 0x10;
-                GI_Func.Grph_inputcl_VA = *(int32_t*)(rip);
-            }
-            else
-            {
-                Use_mobile_UI = 0;
-			}
-
-            //Unhook_hook
-            //old 48 89 F1 E8 ?? ?? ?? ?? 48 89 D9 E8 ?? ?? ?? ?? 80 3D ?? ?? ?? ?? 00 0F 85 ?? ?? ?? ?? 48 8B 0D ?? ?? ?? ?? 80 B9 ?? ?? ?? ?? 00
-            address = PatternScan_Region((uintptr_t)Copy_Text_VA, Text_Vsize, "E8 ?? ?? ?? ?? 48 89 D9 E8 ?? ?? ?? ?? 80 3D ?? ?? ?? ?? 00 0F 85 ?? ?? ?? ?? 48 8B 0D");
-            if (address)
-            {
-                int64_t rip = address;
-                rip += 0x9;
-                rip += *(int32_t*)(rip)+4;
-                GI_Func.UI_unhook_time = rip - (uintptr_t)Copy_Text_VA + Text_Remote_RVA;
-            }
-            else
-            {
-                Use_mobile_UI = 0;
-            }
-        }
 		injectarg.PfuncList = &GI_Func;
     }
 
@@ -2091,23 +1774,6 @@ __Continue:
         return 0;
     }
 
-    if (barg.Path_Lib)
-    {
-        HMODULE mod = 0;
-        DWORD dret = MessageBoxW_Internal(L"You may be banned for using this feature. Make sure you had checked the source and credibility of the plugin.\n\nClick Ok use mem load, Cancel to normal load", L"Load Info", 0x01);
-        if (dret == 6)
-        {
-            mod = RemoteDll_Inject_mem(pi->hProcess, barg.Path_Lib);
-        }
-        else
-        {
-            mod = RemoteDll_Inject(pi->hProcess, barg.Path_Lib);
-        }
-        wstring str_addr = To_Hexwstring_64bit((uint64_t)mod);
-        wprintf_s(L"Plugin BaseAddr : 0x%s", str_addr.c_str());
-        free(barg.Path_Lib);
-    }
-    
     DelWstring(&ProcessPath);
     DelWstring(&ProcessDir);
     DelWstring(&procname);
